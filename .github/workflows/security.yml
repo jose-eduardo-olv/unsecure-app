@@ -2,7 +2,7 @@ name: SAST and DAST Security Scanning
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ dev ]
 
 jobs:
   sast:
