@@ -1,12 +1,9 @@
 package mx.m3security.insecure_app;
 
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
-import javax.crypto.Cipher;
-import javax.crypto.spec.SecretKeySpec;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.sql.Connection;
@@ -14,6 +11,13 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Base64;
+
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 // ponytail: deliberately insecure — fixtures for SAST/secret scanning. DO NOT DEPLOY.
 @RestController
@@ -24,6 +28,7 @@ public class VulnController {
     private static final String DB_PASS = "P@ssw0rd123!";
     private static final String AWS_SECRET = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
     private static final String JWT_SECRET = "supersecretjwtsigningkey-do-not-share";
+    private static final String SECURE_PASSWORD = "P@ssw0rd123!";
 
     // SQL Injection (CWE-89)
     @GetMapping("/user")
