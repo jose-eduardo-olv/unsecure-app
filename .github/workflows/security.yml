@@ -1,0 +1,40 @@
+name: SAST and DAST Security Scanning
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  sast:
+    name: SAST Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run AppScan SAST & DAST
+        uses: HCL-TECH-SOFTWARE/appscan-sast-action@v1.0.8
+        with:
+          asoc_key: ${{ secrets.ASOC_KEY }}
+          asoc_secret: ${{ secrets.ASOC_SECRET }}
+          application_id: ${{ secrets.APPLICATION_ID }}
+          scan_name: ${{ github.repository }}-pr-${{ github.event.pull_request.number }}
+          incremental_scan: true
+          wait_for_analysis: true
+          fail_for_noncompliance: true
+          failure_threshold: Medium
+          personal_scan: ${{ vars.DEBUG_MODE }}
+
+  secrets:
+    name: Secret scanning (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
