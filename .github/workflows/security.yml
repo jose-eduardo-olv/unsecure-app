@@ -22,7 +22,6 @@ jobs:
           asoc_secret: ${{ secrets.ASOC_SECRET }}
           application_id: ${{ secrets.APPLICATION_ID }}
           scan_name: ${{ github.repository }}-pr-${{ github.event.pull_request.number }}
-          incremental_scan: true
           wait_for_analysis: true
           fail_for_noncompliance: true
           failure_threshold: Medium
