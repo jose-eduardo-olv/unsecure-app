@@ -15,10 +15,12 @@ jobs:
       security-events: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Run AppScan SAST & DAST
         uses: HCL-TECH-SOFTWARE/appscan-sast-action@v1.0.7
+        env: 
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
         with:
           asoc_key: ${{ secrets.ASOC_KEY }}
           asoc_secret: ${{ secrets.ASOC_SECRET }}
