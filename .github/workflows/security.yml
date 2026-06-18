@@ -1,9 +1,7 @@
-name: SAST and DAST Security Scanning
+name: SAST, SCA and Secret Scanning
 
 on:
   pull_request:
-    branches: [ dev ]
-  push:
     branches: [ dev ]
 
 jobs:
@@ -15,17 +13,16 @@ jobs:
       security-events: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Run AppScan SAST & DAST
-        uses: HCL-TECH-SOFTWARE/appscan-sast-action@v1.0.7
-        env: 
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+        uses: HCL-TECH-SOFTWARE/appscan-sast-action@v1.0.9
         with:
           asoc_key: ${{ secrets.ASOC_KEY }}
           asoc_secret: ${{ secrets.ASOC_SECRET }}
-          application_id: ${{ secrets.APPLICATION_ID }}
+          application_id: 8ccb0644-a3b6-4755-aba5-b85cebefd1c0
           scan_name: ${{ github.repository }}-pr-${{ github.event.pull_request.number }}
+          incremental_scan: true
           wait_for_analysis: true
           fail_for_noncompliance: true
           failure_threshold: Medium
