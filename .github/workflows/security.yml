@@ -11,28 +11,81 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      pull-requests: write
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
-      - name: Run AppScan SAST & DAST
+      - name: Recover SAST Scan ID from PR comment
+        id: recover
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SCAN_ID=$(gh api \
+            /repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            --jq '[.[] | select(.body | startswith("<!-- sast-scan-id -->"))] | last | .body' \
+            | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' \
+            | head -1)
+
+          if [[ "${SCAN_ID}" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+            echo "scan_id=${SCAN_ID}" >> $GITHUB_OUTPUT
+            echo "is_rescan=true" >> $GITHUB_OUTPUT
+          else
+            echo "scan_id=" >> $GITHUB_OUTPUT
+            echo "is_rescan=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run AppScan SAST
         uses: HCL-TECH-SOFTWARE/appscan-sast-action@v1.0.9
         with:
           asoc_key: ${{ secrets.ASOC_KEY }}
           asoc_secret: ${{ secrets.ASOC_SECRET }}
-          application_id: 8ccb0644-a3b6-4755-aba5-b85cebefd1c0
-          scan_name: ${{ github.repository }}-pr-${{ github.event.pull_request.number }}
-          incremental_scan: true
+          application_id: ${{ secrets.APPLICATION_ID }}
+          scan_name: "${{ github.repository }}-pr-${{ github.event.pull_request.number }}"
+          sast_scan_id: ${{ steps.recover.outputs.scan_id }}
+          incremental_scan: ${{ steps.recover.outputs.is_rescan }}
           wait_for_analysis: true
           fail_for_noncompliance: true
           failure_threshold: Medium
-          personal_scan: ${{ vars.DEBUG_MODE }}
+
+      - name: Extract SAST Scan ID from log
+        if: steps.recover.outputs.is_rescan == 'false'
+        id: extract
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sleep 5
+
+          JOB_ID=$(gh api \
+            /repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs \
+            --jq '.jobs[] | select(.name == "SAST Scan") | .id')
+
+          SCAN_ID=$(gh api \
+            /repos/${{ github.repository }}/actions/jobs/${JOB_ID}/logs \
+            | grep -A1 "^SAST scan ID:" \
+            | tail -1 \
+            | tr -d '[:space:]')
+
+          if [[ ! "${SCAN_ID}" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+            exit 1
+          fi
+
+          echo "scan_id=${SCAN_ID}" >> $GITHUB_OUTPUT
+
+      - name: Post SAST Scan ID to PR comment
+        if: steps.recover.outputs.is_rescan == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body "<!-- sast-scan-id -->
+          **SAST Scan ID:** \`${{ steps.extract.outputs.scan_id }}\`"
 
   secrets:
     name: Secret scanning (Gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v3
