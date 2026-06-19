@@ -16,7 +16,8 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run AppScan SAST & DAST
-        uses: HCL-TECH-SOFTWARE/appscan-sast-action@v1.0.9
+        id: appscan
+        uses: jose-eduardo-olv/appscan-sast-action@feature/scan-id-outputs
         with:
           asoc_key: ${{ secrets.ASOC_KEY }}
           asoc_secret: ${{ secrets.ASOC_SECRET }}
@@ -26,7 +27,12 @@ jobs:
           wait_for_analysis: true
           fail_for_noncompliance: true
           failure_threshold: Medium
-          personal_scan: ${{ vars.DEBUG_MODE }}
+          personal_scan: true
+
+      - name: Print SCA & SAST Output IDs
+        run: |
+          echo "SAST Scan ID: ${{ steps.appscan.outputs.sast-scan-id }}"
+          echo "SCA Scan ID: ${{ steps.appscan.outputs.sca-scan-id }}"
 
   secrets:
     name: Secret scanning (Gitleaks)
@@ -38,3 +44,4 @@ jobs:
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          #GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
