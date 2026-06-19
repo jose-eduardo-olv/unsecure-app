@@ -24,10 +24,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          last_marker_comment=$(gh pr view "$PR_NUMBER" \
-            --json comments \
-            -q '.comments[] | select(.author.login=="github-actions[bot]") | .body' \
-            | grep -F "$SCAN_ID_MARKER" | tail -1 || true)
+          last_marker_comment=$(gh pr view "$PR_NUMBER" --json comments \
+            --jq ".comments[] | select(.body | startswith(\"$SCAN_ID_MARKER\")) | .body" \
+            | tail -1 || true)
           echo "sast=$(echo "$last_marker_comment" | sed -n 's/.*sast=\([^ ]*\).*/\1/p')" >> "$GITHUB_OUTPUT"
           echo "sca=$(echo  "$last_marker_comment" | sed -n 's/.*sca=\([^ ]*\).*/\1/p')"  >> "$GITHUB_OUTPUT"
 
@@ -48,7 +47,7 @@ jobs:
           sca_scan_id:  ${{ steps.previous-scan.outputs.sca }}
 
       - name: Persist scan IDs on PR
-        if: always() && (steps.appscan.outputs.sast-scan-id || steps.appscan.outputs.sca-scan-id)
+        if: always() && steps.previous-scan.outputs.sast == '' && steps.appscan.outputs.sast-scan-id != ''
         env:
           GH_TOKEN: ${{ github.token }}
           SAST_ID: ${{ steps.appscan.outputs.sast-scan-id }}
