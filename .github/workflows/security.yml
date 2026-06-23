@@ -6,27 +6,54 @@ on:
 
 jobs:
   sast:
-    name: SAST Scan
+    name: SAST & SCA Scan
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
+      pull-requests: write
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      SCAN_ID_MARKER: "<!-- appscan-scan-ids -->"
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Run AppScan SAST & DAST
-        uses: HCL-TECH-SOFTWARE/appscan-sast-action@v1.0.9
+      - name: Find previous scan IDs on PR
+        id: previous-scan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          last_marker_comment=$(gh pr view "$PR_NUMBER" --json comments \
+            --jq ".comments[] | select(.body | startswith(\"$SCAN_ID_MARKER\")) | .body" \
+            | tail -1 || true)
+          echo "sast=$(echo "$last_marker_comment" | sed -n 's/.*sast=\([^ ]*\).*/\1/p')" >> "$GITHUB_OUTPUT"
+          echo "sca=$(echo  "$last_marker_comment" | sed -n 's/.*sca=\([^ ]*\).*/\1/p')"  >> "$GITHUB_OUTPUT"
+
+      - name: Run AppScan
+        id: appscan
+        uses: jose-eduardo-olv/appscan-sast-action@feature/scan-id-outputs
         with:
           asoc_key: ${{ secrets.ASOC_KEY }}
           asoc_secret: ${{ secrets.ASOC_SECRET }}
           application_id: 8ccb0644-a3b6-4755-aba5-b85cebefd1c0
-          scan_name: ${{ github.repository }}-pr-${{ github.event.pull_request.number }}
+          scan_name: ${{ github.repository }}-pr-${{ env.PR_NUMBER }}
           incremental_scan: true
           wait_for_analysis: true
           fail_for_noncompliance: true
           failure_threshold: Medium
-          personal_scan: ${{ vars.DEBUG_MODE }}
+          personal_scan: false
+          sast_scan_id: ${{ steps.previous-scan.outputs.sast }}
+          sca_scan_id:  ${{ steps.previous-scan.outputs.sca }}
+
+      - name: Persist scan IDs on PR
+        if: always() && steps.previous-scan.outputs.sast == '' && steps.appscan.outputs.sast-scan-id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SAST_ID: ${{ steps.appscan.outputs.sast-scan-id }}
+          SCA_ID:  ${{ steps.appscan.outputs.sca-scan-id }}
+        run: |
+          gh pr comment "$PR_NUMBER" --body "$SCAN_ID_MARKER sast=$SAST_ID sca=$SCA_ID"
 
   secrets:
     name: Secret scanning (Gitleaks)
@@ -38,3 +65,4 @@ jobs:
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          #GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
